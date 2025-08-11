@@ -129,7 +129,7 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
 
     Column(
         modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         HsvColorPicker(
