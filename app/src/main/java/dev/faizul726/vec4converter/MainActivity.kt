@@ -9,6 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,8 +30,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,6 +84,8 @@ import com.github.skydoves.colorpicker.compose.HsvColorPicker
 import com.github.skydoves.colorpicker.compose.rememberColorPickerController
 import dev.faizul726.vec4converter.ui.theme.Vec4ConverterTheme
 import androidx.core.graphics.toColorInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
@@ -100,13 +107,12 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun Home(bday: String, modifier: Modifier = Modifier) {
+private fun Home(bday: String, modifier: Modifier = Modifier) {
     val controller = rememberColorPickerController()
     var currentColor by remember { mutableStateOf("") }
     var useVec4 by remember { mutableStateOf(false) }
     var decimalDigits by remember { mutableIntStateOf(4) }
-    var currentHex by remember { mutableStateOf("") }
-    //controller.selectByColor(Color(0xFF0099FF), true)
+    var currentHex by remember { mutableStateOf("FFFFFFFF") }
     var showHexPopup by remember { mutableStateOf(false) }
     var showAboutPopup by remember { mutableStateOf(false) }
     var hexInput by remember { mutableStateOf("") }
@@ -116,8 +122,8 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-
-    currentColor = toVec3(currentColor, decimalDigits, useVec4)
+    val scope = rememberCoroutineScope()
+    currentColor = toVec3V2(currentHex, decimalDigits, useVec4)
 
     var output by remember { mutableStateOf("") }
 
@@ -127,61 +133,75 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
         currentColor
     }
 
+
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        HsvColorPicker(
-            controller = controller,
+        Box(
             modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 16.dp)
+                .aspectRatio(1f)
                 .fillMaxWidth()
-                .height(384.dp)
-                .padding(horizontal = 16.dp),
-            onColorChanged = {
-                currentColor = it.color.toString()
-                currentHex = it.hexCode.uppercase()
-            }
-        )
+        ) {
+            HsvColorPicker(
+                controller = controller,
+                onColorChanged = {
+                    currentColor = it.color.toString()
+                    currentHex = it.hexCode.uppercase()
+                },
+                //initialColor = Color("#6650A4".toColorInt()),
+                modifier = Modifier
+            )
+        }
         BrightnessSlider(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
+                .padding(bottom = 10.dp)
                 .height(35.dp),
             controller = controller
         )
-        Spacer(Modifier.height(10.dp))
         AnimatedVisibility(
             visible = useVec4
         ) {
             AlphaSlider(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 10.dp, horizontal = 16.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 10.dp)
                     .height(35.dp),
                 controller = controller
             )
         }
-
         Row(
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 10.dp)
         ) {
             AlphaTile(
                 modifier = Modifier
                     .padding(end = 8.dp)
                     .size(80.dp)
+                    .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
                     .clip(RoundedCornerShape(8.dp)),
                 controller = controller
             )
             Column {
                 Text(
-                    text = if (useVec4) "Output:  vec3  / [vec4]" else "Output: [vec3] /  vec4 ",
+                    text = "Output: ${if (useVec4) " vec3  / [vec4]" else "[vec3] /  vec4 "}",
                     fontFamily = FontFamily.Monospace,
                     fontSize = 14.sp,
                     modifier = Modifier
                         .clickable {
                             useVec4 = !useVec4
-                            currentColor = toVec3(controller.selectedColor.value.toString(), decimalDigits, useVec4)
+                            if (!useVec4) {
+                                currentHex = currentHex.replaceRange(0, 2, "FF")
+                                controller.selectByColor(Color("#$currentHex".toColorInt()), true)
+                            }
+                            currentColor = toVec3V2(currentHex, decimalDigits, useVec4)
+                            //currentColor = toVec3(controller.selectedColor.value.toString(), decimalDigits, useVec4)
                         }
                 )
                 Text(
@@ -191,7 +211,8 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
                     modifier = Modifier
                         .clickable {
                             decimalDigits = if (decimalDigits == 4) 2 else 4
-                            currentColor = toVec3(controller.selectedColor.value.toString(), decimalDigits, useVec4)
+                            currentColor = toVec3V2(currentHex, decimalDigits, useVec4)
+                            //currentColor = toVec3(controller.selectedColor.value.toString(), decimalDigits, useVec4)
                         }
                 )
                 Text(
@@ -212,7 +233,11 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
                                 onLongPress = {
                                     clipboardManager.setText(AnnotatedString(currentHex))
                                     if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
-                                        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Copied \"$currentHex\" to clipboard",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                 }
                             )
                         }
@@ -253,19 +278,23 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
                                 hexInput = it
                             },
                             trailingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        hexInput = ""
+                                if (hexInput.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = {
+                                            hexInput = ""
+                                        }
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.backspace),
+                                            contentDescription = null
+                                        )
                                     }
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.backspace),
-                                        contentDescription = null
-                                    )
+                                } else {
+                                    null
                                 }
                             },
                             isError = !(hexInput.isNotBlank() && hexInput.matches(Regex("^#?([A-Fa-f0-9]{8}|[A-Fa-f0-9]{6})$"))),
-                            label = { Text("RGB/RGBA") },
+                            label = { Text("RGB/ARGB") },
                             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
                             singleLine = true,
                             maxLines = 1,
@@ -392,15 +421,14 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-
+            modifier = Modifier.padding(bottom = 10.dp)
         ) {
             Text(
                 text = output,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(end = 4.dp)
+                fontWeight = FontWeight.Medium
             )
-            IconButton(
+            /*IconButton(
                 onClick = {
                     clipboardManager.setText(AnnotatedString(output))
                     if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
@@ -411,32 +439,34 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
                     painter = painterResource(R.drawable.content_copy),
                     contentDescription = null,
                 )
-            }
+            }*/
         }
-        /*Row(
-            Modifier.clickable {
+        Button(
+            onClick = {
                 clipboardManager.setText(AnnotatedString(output))
-            },
-            verticalAlignment = Alignment.CenterVertically
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2)
+                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
         ) {
             Icon(
                 painter = painterResource(R.drawable.content_copy),
                 contentDescription = null,
                 modifier = Modifier
                     .padding(end = 4.dp)
-                    .size(12.dp)
+                    .size(18.dp)
             )
-            Text("Copy to clipboard", fontSize = 12.sp)
-        }*/
+            Text("Copy to clipboard")
+        }
     }
+
     Box(
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         IconButton(
             onClick = {
                 showAboutPopup = true
             },
-            modifier = modifier.align(Alignment.CenterEnd)
+            modifier = Modifier.align(Alignment.CenterEnd)
         ) {
             Icon(
                 painter = painterResource(R.drawable.info),
@@ -444,6 +474,30 @@ fun Home(bday: String, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+@OptIn(ExperimentalStdlibApi::class)
+private fun toVec3V2(hex: String, precision: Int, useVec4: Boolean): String {
+    var (a, r, g, b) = hex.chunked(2) // Thanks ChatGPT
+
+    a = doMath(a, precision)
+    r = doMath(r, precision)
+    g = doMath(g, precision)
+    b = doMath(b, precision)
+
+    return if (useVec4) {
+        "$r, $g, $b $a"
+    } else {
+        "$r, $g, $b"
+    }
+}
+
+@OptIn(ExperimentalStdlibApi::class)
+private fun doMath(input: String, precision: Int): String {
+    val number: Float = input.hexToInt().toFloat() / 255
+    var output = "%.${precision}f".format(number).trimEnd('0').trimEnd('.')
+    if (!output.contains('.')) output += ".0"
+    return output
 }
 
 private fun toVec3(hex: String, precision: Int, useVec4: Boolean): String {
